@@ -6,7 +6,7 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#define BUFFER_SIZE 1000
+#define BUFFER_SIZE 6500
 
 typedef struct client {
     int id;
@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
         }
         for (int i = 0; i <= maxfd; i++)
         { 
-            if (!FD_ISSET(clients[i].fd, &readfds))
+            if (!FD_ISSET(i, &readfds))
                 continue;
             if (i == sockfd)
             {
@@ -143,7 +143,7 @@ int main(int argc, char **argv) {
             }
             else
             {
-                int bytes_recv = recv(i, buffer, 999, 0);
+                int bytes_recv = recv(i, buffer, 6499, 0);
                 if (bytes_recv <= 0)
                 {
                     sprintf(write_buffer, "server: client %d just left\n", clients[i].id);
@@ -167,7 +167,7 @@ int main(int argc, char **argv) {
                     sprintf(write_buffer, "client %d: %s", clients[i].id, msg);
                     for (int j = 0; j <= maxfd; j++)
                     {
-                        if (FD_ISSET(j, &activefds) && j != i)
+                        if (FD_ISSET(j, &writefds) && j != i)
                             send(j, write_buffer, strlen(write_buffer), 0);
                     }
                     free(msg);
