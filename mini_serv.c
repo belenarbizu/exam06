@@ -6,7 +6,6 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#define BUFFER_SIZE 6500
 
 typedef struct client {
     int id;
@@ -70,8 +69,8 @@ int main(int argc, char **argv) {
 	int sockfd, maxfd;
 	struct sockaddr_in servaddr;
     Client clients[200];
-    char buffer[BUFFER_SIZE];
-    char write_buffer[BUFFER_SIZE];
+    char buffer[2000];
+    char write_buffer[2000];
     fd_set readfds, writefds, activefds;
     int next_id = 0;
 
@@ -143,7 +142,7 @@ int main(int argc, char **argv) {
             }
             else
             {
-                int bytes_recv = recv(i, buffer, 6499, 0);
+                int bytes_recv = recv(i, buffer, 999, 0);
                 if (bytes_recv <= 0)
                 {
                     sprintf(write_buffer, "server: client %d just left\n", clients[i].id);
@@ -157,18 +156,20 @@ int main(int argc, char **argv) {
                     close(i);
                     break;
                 }
-                buffer[bytes_recv] = '\0'; // Agregar terminador nulo
+                buffer[bytes_recv] = '\0';
                 clients[i].msgs = str_join(clients[i].msgs, buffer);
 
-                // Enviar mensajes a otros clientes
                 char *msg;
                 while (extract_message(&(clients[i].msgs), &msg))
                 {
-                    sprintf(write_buffer, "client %d: %s", clients[i].id, msg);
+                    sprintf(write_buffer, "client %d: ", clients[i].id);
                     for (int j = 0; j <= maxfd; j++)
                     {
                         if (FD_ISSET(j, &writefds) && j != i)
+                        {
                             send(j, write_buffer, strlen(write_buffer), 0);
+                            send(j, msg, strlen(msg), 0);
+                        }
                     }
                     free(msg);
                 }
