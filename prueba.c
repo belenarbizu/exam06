@@ -68,43 +68,44 @@ char *str_join(char *buf, char *add)
 
 int main(int argc, char **argv) {
 	int sockfd;
-    socklen_t len;
 	struct sockaddr_in servaddr;
-    Client clients[200];
     char buffer[2000];
     char write_buffer[2000];
-    fd_set activefds, readfds, writefds;
-    int max_fd;
-    int next_id = 0;
+    Client clients[200]; 
+    int max_fd, next_id = 0;
+    fd_set activefds, writefds, readfds;
 
     if (argc != 2)
     {
         print_error("Wrong number of arguments\n");
         exit(1);
     }
-
+ 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0); 
 	if (sockfd == -1) { 
-		print_error("Fatal error\n");
+		print_error("Fatal error\n"); 
 		exit(1); 
 	} 
 
 	bzero(&servaddr, sizeof(servaddr)); 
 	servaddr.sin_family = AF_INET; 
 	servaddr.sin_addr.s_addr = htonl(2130706433); //127.0.0.1
-	servaddr.sin_port = htons(atoi(argv[1])); 
+	servaddr.sin_port = htons(8081); 
 
 	if ((bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr))) != 0) { 
-		print_error("Fatal error\n");
-		exit(1);
+		print_error("Fatal error\n"); 
+		exit(1); 
 	} 
 
 	if (listen(sockfd, 100) != 0) {
-		print_error("Fatal error\n");
+		print_error("Fatal error\n"); 
 		exit(1); 
 	}
 
     max_fd = sockfd;
+    FD_ZERO(&activefds);
+    FD_SET(sockfd, &activefds);
+    socklen_t len;
     int client_fd;
 
     while (1)
@@ -113,19 +114,20 @@ int main(int argc, char **argv) {
         if (select(max_fd + 1, &readfds, &writefds, NULL, NULL) < 0)
         {
             print_error("Fatal error\n");
-            exit(1);
+		    exit(1);
         }
+        
         for (int i = 0; i <= max_fd; i++)
         {
             if (!FD_ISSET(i, &readfds))
                 continue;
             if (i == sockfd)
             {
-                len = sizeof(servaddr);
-                client_fd = accept(sockfd, (struct sockaddr *)&servaddr, &len);
+                len = sizeof(sockaddr_in);
+                client_fd = accept(sockfd, (struct sockaddr *)&sockaddr, &len);
                 if (client_fd < 0) { 
                     print_error("Fatal error\n");
-                    exit(1); 
+		            exit(1);
                 }
                 clients[client_fd].id = next_id++;
                 clients[client_fd].msgs = NULL;
@@ -135,7 +137,7 @@ int main(int argc, char **argv) {
                 sprintf(write_buffer, "server: client %d just arrived\n", clients[client_fd].id);
                 for (int j = 0; j <= max_fd; j++)
                 {
-                    if (FD_ISSET(j, &activefds) && j != i)
+                    if (FD_ISSET(j, &writefds) && j != i)
                         send(j, write_buffer, strlen(write_buffer), 0);
                 }
                 break;
@@ -145,26 +147,26 @@ int main(int argc, char **argv) {
                 int recv_bytes = recv(i, buffer, 1999, 0);
                 if (recv_bytes <= 0)
                 {
-                    sprintf(write_buffer, "server: client %d just left\n", clients[i].id);
+                    sprintf(write_buffer, "server: client %d just left\n", clients[client_fd].id);
                     for (int j = 0; j <= max_fd; j++)
                     {
-                        if (FD_ISSET(j, &activefds) && j != i)
+                        if (FD_ISSET(j, &writefds) && j != i)
                             send(j, write_buffer, strlen(write_buffer), 0);
                     }
+                    free(clients[i].msgs);
                     FD_CLR(i, &activefds);
                     close(i);
-                    free(clients[i].msgs);
                     break;
                 }
                 buffer[recv_bytes] = '\0';
                 clients[i].msgs = str_join(clients[i].msgs, buffer);
                 char *msg;
-                while (extract_message(&(clients[i].msgs), &msg))
+                while (extract_message(&(clients[i].msgs), msg))
                 {
                     sprintf(write_buffer, "client %d: ", clients[i].id);
                     for (int j = 0; j <= max_fd; j++)
                     {
-                        if (FD_ISSET(j, &activefds) && j != i)
+                        if (FD_ISSET(j, &writefds) && j != i)
                         {
                             send(j, write_buffer, strlen(write_buffer), 0);
                             send(j, msg, strlen(msg), 0);
@@ -172,7 +174,6 @@ int main(int argc, char **argv) {
                     }
                 }
             }
-
         }
     }
     return 0;
